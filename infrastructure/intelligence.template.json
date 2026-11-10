@@ -1,0 +1,106 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "A3 optional S3 Vectors resources adapted from A2; no A2 vector reuse",
+  "Parameters": {
+    "StudentId": {
+      "Type": "String",
+      "Default": "n00000000",
+      "AllowedPattern": "n[0-9]{8}"
+    },
+    "QutUsername": {
+      "Type": "String",
+      "Default": "student@example.edu"
+    }
+  },
+  "Rules": {
+    "SydneyOnly": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::Region"
+              },
+              "ap-southeast-2"
+            ]
+          },
+          "AssertDescription": "Deploy regional resources in ap-southeast-2"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "VectorBucket": {
+      "Type": "AWS::S3Vectors::VectorBucket",
+      "Properties": {
+        "VectorBucketName": {
+          "Fn::Sub": "${StudentId}-a3-photo-vectors"
+        },
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "VectorIndex": {
+      "Type": "AWS::S3Vectors::Index",
+      "Properties": {
+        "VectorBucketArn": {
+          "Ref": "VectorBucket"
+        },
+        "IndexName": {
+          "Fn::Sub": "${StudentId}-a3-photo-index"
+        },
+        "DataType": "float32",
+        "Dimension": 1024,
+        "DistanceMetric": "cosine",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    }
+  },
+  "Outputs": {
+    "VectorBucketArn": {
+      "Value": {
+        "Ref": "VectorBucket"
+      }
+    },
+    "VectorBucketName": {
+      "Value": {
+        "Fn::Sub": "${StudentId}-a3-photo-vectors"
+      }
+    },
+    "VectorIndexArn": {
+      "Value": {
+        "Ref": "VectorIndex"
+      }
+    },
+    "VectorIndexName": {
+      "Value": {
+        "Fn::Sub": "${StudentId}-a3-photo-index"
+      }
+    }
+  }
+}

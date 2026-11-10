@@ -1,0 +1,106 @@
+[
+  {
+    "ParameterKey": "CreateA3Cluster",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "ReuseAssignment2Resources",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "ExistingClusterName",
+    "ParameterValue": "n00000000-a2-cluster"
+  },
+  {
+    "ParameterKey": "ImageUri",
+    "ParameterValue": "REPLACE_WITH_A3_ECR_IMAGE_URI_AND_IMMUTABLE_TAG"
+  },
+  {
+    "ParameterKey": "ExecutionRoleArn",
+    "ParameterValue": "REPLACE_WITH_EXISTING_COURSE_EXECUTION_ROLE_ARN"
+  },
+  {
+    "ParameterKey": "TaskRoleArn",
+    "ParameterValue": "REPLACE_WITH_EXISTING_COURSE_TASK_ROLE_ARN"
+  },
+  {
+    "ParameterKey": "CertificateArn",
+    "ParameterValue": "REPLACE_WITH_SYDNEY_ACM_CERTIFICATE_ARN"
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": "REPLACE_WITH_EXISTING_VPC_ID"
+  },
+  {
+    "ParameterKey": "LoadBalancerSubnets",
+    "ParameterValue": "REPLACE_WITH_TWO_PUBLIC_SUBNET_IDS_COMMA_SEPARATED"
+  },
+  {
+    "ParameterKey": "TaskSubnets",
+    "ParameterValue": "REPLACE_WITH_TASK_SUBNET_IDS_COMMA_SEPARATED"
+  },
+  {
+    "ParameterKey": "AssignPublicIp",
+    "ParameterValue": "DISABLED"
+  },
+  {
+    "ParameterKey": "ChatModelId",
+    "ParameterValue": "nvidia.nemotron-super-3-120b"
+  },
+  {
+    "ParameterKey": "VisionModelId",
+    "ParameterValue": "google.gemma-3-12b-it"
+  },
+  {
+    "ParameterKey": "EmbeddingModelId",
+    "ParameterValue": "amazon.titan-embed-text-v2:0"
+  },
+  {
+    "ParameterKey": "MediaBucket",
+    "ParameterValue": "n00000000-a2-agent-media"
+  },
+  {
+    "ParameterKey": "LibraryTable",
+    "ParameterValue": "n00000000-a2-classifications"
+  },
+  {
+    "ParameterKey": "ProcessingQueueUrl",
+    "ParameterValue": "REPLACE_WITH_VERIFIED_REUSED_QUEUE_URL"
+  },
+  {
+    "ParameterKey": "ProcessingQueueName",
+    "ParameterValue": "n00000000-a2-classification"
+  },
+  {
+    "ParameterKey": "ApiLogGroup",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "WorkerLogGroup",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "CognitoPoolId",
+    "ParameterValue": "REPLACE_WITH_REUSED_COGNITO_POOL_ID"
+  },
+  {
+    "ParameterKey": "CognitoClientId",
+    "ParameterValue": "REPLACE_WITH_REUSED_PUBLIC_APP_CLIENT_ID"
+  },
+  {
+    "ParameterKey": "VectorBucketName",
+    "ParameterValue": "n00000000-a2-photo-vectors"
+  },
+  {
+    "ParameterKey": "VectorIndexName",
+    "ParameterValue": "n00000000-photo-index"
+  },
+  {
+    "ParameterKey": "LoadBalancerSecurityGroup",
+    "ParameterValue": "sg-032bd1ff8cf77dbb9"
+  },
+  {
+    "ParameterKey": "TaskSecurityGroup",
+    "ParameterValue": "sg-032bd1ff8cf77dbb9"
+  }
+]

@@ -1,0 +1,200 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "A3 optional private CloudFront image delivery; confirm course global-service rules",
+  "Parameters": {
+    "StudentId": {
+      "Type": "String",
+      "Default": "n00000000",
+      "AllowedPattern": "n[0-9]{8}"
+    },
+    "QutUsername": {
+      "Type": "String",
+      "Default": "student@example.edu"
+    },
+    "MediaBucket": {
+      "Type": "String"
+    },
+    "PublicKeyPem": {
+      "Type": "String",
+      "Description": "RSA public key only; store the private key in Secrets Manager"
+    }
+  },
+  "Rules": {
+    "SydneyOnly": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::Region"
+              },
+              "ap-southeast-2"
+            ]
+          },
+          "AssertDescription": "Deploy regional resources in ap-southeast-2"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "PublicKey": {
+      "Type": "AWS::CloudFront::PublicKey",
+      "Properties": {
+        "PublicKeyConfig": {
+          "CallerReference": {
+            "Fn::Sub": "${AWS::StackName}-key"
+          },
+          "Name": {
+            "Fn::Sub": "${StudentId}-a3-image-key"
+          },
+          "EncodedKey": {
+            "Ref": "PublicKeyPem"
+          }
+        }
+      }
+    },
+    "KeyGroup": {
+      "Type": "AWS::CloudFront::KeyGroup",
+      "Properties": {
+        "KeyGroupConfig": {
+          "Name": {
+            "Fn::Sub": "${StudentId}-a3-images"
+          },
+          "Items": [
+            {
+              "Ref": "PublicKey"
+            }
+          ]
+        }
+      }
+    },
+    "OriginAccess": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${StudentId}-a3-s3"
+          },
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "Distribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ],
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": {
+            "Fn::Sub": "${StudentId} assessment 3 private image variants"
+          },
+          "PriceClass": "PriceClass_100",
+          "Origins": [
+            {
+              "Id": "media",
+              "DomainName": {
+                "Fn::Sub": "${MediaBucket}.s3.${AWS::Region}.amazonaws.com"
+              },
+              "OriginAccessControlId": {
+                "Ref": "OriginAccess"
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "media",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "CachedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "Compress": true,
+            "TrustedKeyGroups": [
+              {
+                "Ref": "KeyGroup"
+              }
+            ],
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+          },
+          "ViewerCertificate": {
+            "CloudFrontDefaultCertificate": true
+          }
+        }
+      }
+    },
+    "BucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "MediaBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:s3:::${MediaBucket}/derived/*"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "CdnDomain": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Distribution",
+          "DomainName"
+        ]
+      }
+    },
+    "DistributionId": {
+      "Value": {
+        "Ref": "Distribution"
+      }
+    },
+    "CdnKeyPairId": {
+      "Value": {
+        "Ref": "PublicKey"
+      }
+    },
+    "KeyGroupId": {
+      "Value": {
+        "Ref": "KeyGroup"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+*
+!requirements.txt
+!photo_library/
+!photo_library/**
+photo_library/**/__pycache__/
+
+!frontend/
+!frontend/**

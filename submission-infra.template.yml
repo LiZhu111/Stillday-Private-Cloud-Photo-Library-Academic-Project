@@ -1,0 +1,13 @@
+# Planning template only. Replace this with verified deployed resources before submission.
+# Do not submit an empty inventory. Include external dependencies such as reused Cognito,
+# course roles, actual model identifiers and the network resources the solution depends on.
+cloudInfrastructure: []
+
+metaData:
+  qutUsernameTag: student@example.edu
+
+# Every actual entry must contain:
+# - type: <resource kind>
+#   arn: <real ARN or accepted unique identifier>
+#   description: <one English sentence explaining its purpose>
+

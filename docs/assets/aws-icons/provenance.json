@@ -1,0 +1,16 @@
+{
+  "source": "https://d1.awsstatic.com/onedam/marketing-channels/website/public/shared/architecture-icon-release/Icon-package_07312026.5846e92413caa21490223536cc97f1269e44fa92.zip",
+  "icons": {
+    "Amazon-Elastic-Container-Service": "Architecture-Service-Icons_07312026/Arch_Containers/64/Arch_Amazon-Elastic-Container-Service_64.png",
+    "Amazon-Simple-Storage-Service": "Architecture-Service-Icons_07312026/Arch_Storage/64/Arch_Amazon-Simple-Storage-Service_64.png",
+    "Amazon-DynamoDB": "Architecture-Service-Icons_07312026/Arch_Databases/64/Arch_Amazon-DynamoDB_64.png",
+    "Amazon-Simple-Queue-Service": "Architecture-Service-Icons_07312026/Arch_Application-Integration/64/Arch_Amazon-Simple-Queue-Service_64.png",
+    "Amazon-Cognito": "Architecture-Service-Icons_07312026/Arch_Security-Identity/64/Arch_Amazon-Cognito_64.png",
+    "Amazon-CloudWatch": "Architecture-Service-Icons_07312026/Arch_Management-Tools/64/Arch_Amazon-CloudWatch_64.png",
+    "Elastic-Load-Balancing": "Architecture-Service-Icons_07312026/Arch_Networking-Content-Delivery/64/Arch_Elastic-Load-Balancing_64.png",
+    "AWS-Auto-Scaling": "Architecture-Service-Icons_07312026/Arch_Management-Tools/64/Arch_AWS-Auto-Scaling_64.png",
+    "Amazon-Route-53": "Architecture-Service-Icons_07312026/Arch_Networking-Content-Delivery/64/Arch_Amazon-Route-53_64.png",
+    "AWS-Certificate-Manager": "Architecture-Service-Icons_07312026/Arch_Security-Identity/64/Arch_AWS-Certificate-Manager_64.png",
+    "Amazon-Elastic-Container-Registry": "Architecture-Service-Icons_07312026/Arch_Containers/64/Arch_Amazon-Elastic-Container-Registry_64.png"
+  }
+}

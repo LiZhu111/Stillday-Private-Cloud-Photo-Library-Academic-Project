@@ -1,0 +1,1239 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "A3 API and worker services, queue-driven autoscaling, existing course IAM roles",
+  "Parameters": {
+    "StudentId": {
+      "Type": "String",
+      "Default": "n00000000",
+      "AllowedPattern": "n[0-9]{8}"
+    },
+    "QutUsername": {
+      "Type": "String",
+      "Default": "student@example.edu"
+    },
+    "ImageUri": {
+      "Type": "String",
+      "Description": "Immutable ECR image tag or digest",
+      "MinLength": 1
+    },
+    "ExecutionRoleArn": {
+      "Type": "String",
+      "Description": "Existing course ECS execution role ARN",
+      "MinLength": 1
+    },
+    "TaskRoleArn": {
+      "Type": "String",
+      "Description": "Existing course task role ARN; check docs/permissions.md",
+      "MinLength": 1
+    },
+    "CertificateArn": {
+      "Type": "String",
+      "Description": "Existing ACM certificate ARN for HTTPS API hostname",
+      "MinLength": 1
+    },
+    "MediaBucket": {
+      "Type": "String",
+      "Description": "Data stack bucket name",
+      "MinLength": 1
+    },
+    "LibraryTable": {
+      "Type": "String",
+      "Description": "Data stack table name",
+      "MinLength": 1
+    },
+    "ProcessingQueueUrl": {
+      "Type": "String",
+      "Description": "Data stack queue URL",
+      "MinLength": 1
+    },
+    "ProcessingQueueName": {
+      "Type": "String",
+      "Description": "Data stack queue name",
+      "MinLength": 1
+    },
+    "CognitoPoolId": {
+      "Type": "String",
+      "Description": "Reuse the permitted existing Cognito user pool",
+      "MinLength": 1
+    },
+    "CognitoClientId": {
+      "Type": "String",
+      "Description": "Existing public app client for user login",
+      "MinLength": 1
+    },
+    "ReuseAssignment2Resources": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": [
+        "true",
+        "false"
+      ]
+    },
+    "ApiLogGroup": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing log group; leave empty to create a dedicated A3 group"
+    },
+    "WorkerLogGroup": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing log group; leave empty to create a dedicated A3 group"
+    },
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "LoadBalancerSubnets": {
+      "Type": "List<AWS::EC2::Subnet::Id>",
+      "Description": "At least two public subnets in different AZs"
+    },
+    "TaskSubnets": {
+      "Type": "List<AWS::EC2::Subnet::Id>",
+      "Description": "Subnets with outbound AWS connectivity"
+    },
+    "AssignPublicIp": {
+      "Type": "String",
+      "Default": "DISABLED",
+      "AllowedValues": [
+        "ENABLED",
+        "DISABLED"
+      ]
+    },
+    "VectorBucketName": {
+      "Type": "String",
+      "Default": ""
+    },
+    "VectorIndexName": {
+      "Type": "String",
+      "Default": ""
+    },
+    "CdnDomain": {
+      "Type": "String",
+      "Default": ""
+    },
+    "CdnKeyPairId": {
+      "Type": "String",
+      "Default": ""
+    },
+    "CdnPrivateKeySecretArn": {
+      "Type": "String",
+      "Default": ""
+    },
+    "ChatModelId": {
+      "Type": "String",
+      "Default": "nvidia.nemotron-super-3-120b"
+    },
+    "VisionModelId": {
+      "Type": "String",
+      "Default": "google.gemma-3-12b-it"
+    },
+    "EmbeddingModelId": {
+      "Type": "String",
+      "Default": "amazon.titan-embed-text-v2:0"
+    },
+    "CreateA3Cluster": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "Description": "Set true only when the existing A2 ECS cluster cannot be reused"
+    },
+    "ExistingClusterName": {
+      "Type": "String",
+      "Default": "n00000000-a2-cluster",
+      "Description": "Reusable CAB432 ECS cluster; ignored when CreateA3Cluster is true"
+    },
+    "LoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Description": "Existing course-approved ALB security group"
+    },
+    "TaskSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Description": "Existing course-approved task security group"
+    }
+  },
+  "Rules": {
+    "SydneyOnly": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::Region"
+              },
+              "ap-southeast-2"
+            ]
+          },
+          "AssertDescription": "Deploy regional resources in ap-southeast-2"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "ApiLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/${StudentId}/a3/api"
+        },
+        "RetentionInDays": 7,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Condition": "CreateApiLogs"
+    },
+    "WorkerLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/${StudentId}/a3/worker"
+        },
+        "RetentionInDays": 7,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Condition": "CreateWorkerLogs"
+    },
+    "Cluster": {
+      "Type": "AWS::ECS::Cluster",
+      "Properties": {
+        "ClusterName": {
+          "Fn::Sub": "${StudentId}-a3-cluster"
+        },
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "Condition": "UseDedicatedA3Cluster"
+    },
+    "LoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${StudentId}-a3-alb"
+        },
+        "Scheme": "internet-facing",
+        "Type": "application",
+        "Subnets": {
+          "Ref": "LoadBalancerSubnets"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "LoadBalancerSecurityGroup"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "TargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${StudentId}-a3-api"
+        },
+        "Port": 8080,
+        "Protocol": "HTTP",
+        "TargetType": "ip",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "HealthCheckPath": "/healthz",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "Listener": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "LoadBalancerArn": {
+          "Ref": "LoadBalancer"
+        },
+        "Port": 443,
+        "Protocol": "HTTPS",
+        "Certificates": [
+          {
+            "CertificateArn": {
+              "Ref": "CertificateArn"
+            }
+          }
+        ],
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": {
+              "Ref": "TargetGroup"
+            }
+          }
+        ]
+      }
+    },
+    "ApiTask": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "Family": {
+          "Fn::Sub": "${StudentId}-a3-api"
+        },
+        "Cpu": "256",
+        "Memory": "512",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE"
+        ],
+        "ExecutionRoleArn": {
+          "Ref": "ExecutionRoleArn"
+        },
+        "TaskRoleArn": {
+          "Ref": "TaskRoleArn"
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": "api",
+            "Image": {
+              "Ref": "ImageUri"
+            },
+            "Essential": true,
+            "Environment": [
+              {
+                "Name": "APP_MODE",
+                "Value": "aws"
+              },
+              {
+                "Name": "AWS_REGION",
+                "Value": {
+                  "Ref": "AWS::Region"
+                }
+              },
+              {
+                "Name": "STUDENT_ID",
+                "Value": {
+                  "Ref": "StudentId"
+                }
+              },
+              {
+                "Name": "MEDIA_BUCKET",
+                "Value": {
+                  "Ref": "MediaBucket"
+                }
+              },
+              {
+                "Name": "LIBRARY_TABLE",
+                "Value": {
+                  "Ref": "LibraryTable"
+                }
+              },
+              {
+                "Name": "PROCESSING_QUEUE_URL",
+                "Value": {
+                  "Ref": "ProcessingQueueUrl"
+                }
+              },
+              {
+                "Name": "COGNITO_POOL_ID",
+                "Value": {
+                  "Ref": "CognitoPoolId"
+                }
+              },
+              {
+                "Name": "COGNITO_CLIENT_ID",
+                "Value": {
+                  "Ref": "CognitoClientId"
+                }
+              },
+              {
+                "Name": "CHAT_MODEL_ID",
+                "Value": {
+                  "Ref": "ChatModelId"
+                }
+              },
+              {
+                "Name": "REUSE_ASSIGNMENT2_RESOURCES",
+                "Value": {
+                  "Ref": "ReuseAssignment2Resources"
+                }
+              },
+              {
+                "Name": "DYNAMODB_LAYOUT",
+                "Value": {
+                  "Fn::If": [
+                    "ReuseA2Data",
+                    "assignment2-classifications",
+                    "pk-sk"
+                  ]
+                }
+              },
+              {
+                "Name": "VISION_MODEL_ID",
+                "Value": {
+                  "Ref": "VisionModelId"
+                }
+              },
+              {
+                "Name": "EMBEDDING_MODEL_ID",
+                "Value": {
+                  "Ref": "EmbeddingModelId"
+                }
+              },
+              {
+                "Name": "VECTOR_BUCKET_NAME",
+                "Value": {
+                  "Ref": "VectorBucketName"
+                }
+              },
+              {
+                "Name": "VECTOR_INDEX_NAME",
+                "Value": {
+                  "Ref": "VectorIndexName"
+                }
+              },
+              {
+                "Name": "CDN_DOMAIN",
+                "Value": {
+                  "Ref": "CdnDomain"
+                }
+              },
+              {
+                "Name": "CDN_KEY_PAIR_ID",
+                "Value": {
+                  "Ref": "CdnKeyPairId"
+                }
+              },
+              {
+                "Name": "CDN_PRIVATE_KEY_SECRET_ARN",
+                "Value": {
+                  "Ref": "CdnPrivateKeySecretArn"
+                }
+              }
+            ],
+            "StopTimeout": 120,
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Fn::If": [
+                    "CreateApiLogs",
+                    {
+                      "Ref": "ApiLogs"
+                    },
+                    {
+                      "Ref": "ApiLogGroup"
+                    }
+                  ]
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "api"
+              }
+            },
+            "PortMappings": [
+              {
+                "ContainerPort": 8080,
+                "Protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "ApiService": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "ServiceName": {
+          "Fn::Sub": "${StudentId}-a3-api"
+        },
+        "Cluster": {
+          "Fn::If": [
+            "UseDedicatedA3Cluster",
+            {
+              "Ref": "Cluster"
+            },
+            {
+              "Ref": "ExistingClusterName"
+            }
+          ]
+        },
+        "TaskDefinition": {
+          "Ref": "ApiTask"
+        },
+        "DesiredCount": 1,
+        "LaunchType": "FARGATE",
+        "DeploymentConfiguration": {
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true
+          }
+        },
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": {
+              "Ref": "AssignPublicIp"
+            },
+            "Subnets": {
+              "Ref": "TaskSubnets"
+            },
+            "SecurityGroups": [
+              {
+                "Ref": "TaskSecurityGroup"
+              }
+            ]
+          }
+        },
+        "PropagateTags": "SERVICE",
+        "EnableECSManagedTags": true,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ],
+        "LoadBalancers": [
+          {
+            "TargetGroupArn": {
+              "Ref": "TargetGroup"
+            },
+            "ContainerName": "api",
+            "ContainerPort": 8080
+          }
+        ],
+        "HealthCheckGracePeriodSeconds": 30
+      },
+      "DependsOn": "Listener"
+    },
+    "ApiScalingTarget": {
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+      "Properties": {
+        "MinCapacity": 1,
+        "MaxCapacity": 2,
+        "ResourceId": {
+          "Fn::Join": [
+            "/",
+            [
+              "service",
+              {
+                "Fn::If": [
+                  "UseDedicatedA3Cluster",
+                  {
+                    "Ref": "Cluster"
+                  },
+                  {
+                    "Ref": "ExistingClusterName"
+                  }
+                ]
+              },
+              {
+                "Fn::GetAtt": [
+                  "ApiService",
+                  "Name"
+                ]
+              }
+            ]
+          ]
+        },
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "ServiceNamespace": "ecs",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "WorkerTask": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "Family": {
+          "Fn::Sub": "${StudentId}-a3-worker"
+        },
+        "Cpu": "1024",
+        "Memory": "2048",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE"
+        ],
+        "ExecutionRoleArn": {
+          "Ref": "ExecutionRoleArn"
+        },
+        "TaskRoleArn": {
+          "Ref": "TaskRoleArn"
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": "worker",
+            "Image": {
+              "Ref": "ImageUri"
+            },
+            "Essential": true,
+            "Environment": [
+              {
+                "Name": "APP_MODE",
+                "Value": "aws"
+              },
+              {
+                "Name": "AWS_REGION",
+                "Value": {
+                  "Ref": "AWS::Region"
+                }
+              },
+              {
+                "Name": "STUDENT_ID",
+                "Value": {
+                  "Ref": "StudentId"
+                }
+              },
+              {
+                "Name": "MEDIA_BUCKET",
+                "Value": {
+                  "Ref": "MediaBucket"
+                }
+              },
+              {
+                "Name": "LIBRARY_TABLE",
+                "Value": {
+                  "Ref": "LibraryTable"
+                }
+              },
+              {
+                "Name": "PROCESSING_QUEUE_URL",
+                "Value": {
+                  "Ref": "ProcessingQueueUrl"
+                }
+              },
+              {
+                "Name": "COGNITO_POOL_ID",
+                "Value": {
+                  "Ref": "CognitoPoolId"
+                }
+              },
+              {
+                "Name": "COGNITO_CLIENT_ID",
+                "Value": {
+                  "Ref": "CognitoClientId"
+                }
+              },
+              {
+                "Name": "CHAT_MODEL_ID",
+                "Value": {
+                  "Ref": "ChatModelId"
+                }
+              },
+              {
+                "Name": "REUSE_ASSIGNMENT2_RESOURCES",
+                "Value": {
+                  "Ref": "ReuseAssignment2Resources"
+                }
+              },
+              {
+                "Name": "DYNAMODB_LAYOUT",
+                "Value": {
+                  "Fn::If": [
+                    "ReuseA2Data",
+                    "assignment2-classifications",
+                    "pk-sk"
+                  ]
+                }
+              },
+              {
+                "Name": "VISION_MODEL_ID",
+                "Value": {
+                  "Ref": "VisionModelId"
+                }
+              },
+              {
+                "Name": "EMBEDDING_MODEL_ID",
+                "Value": {
+                  "Ref": "EmbeddingModelId"
+                }
+              },
+              {
+                "Name": "VECTOR_BUCKET_NAME",
+                "Value": {
+                  "Ref": "VectorBucketName"
+                }
+              },
+              {
+                "Name": "VECTOR_INDEX_NAME",
+                "Value": {
+                  "Ref": "VectorIndexName"
+                }
+              },
+              {
+                "Name": "CDN_DOMAIN",
+                "Value": {
+                  "Ref": "CdnDomain"
+                }
+              },
+              {
+                "Name": "CDN_KEY_PAIR_ID",
+                "Value": {
+                  "Ref": "CdnKeyPairId"
+                }
+              },
+              {
+                "Name": "CDN_PRIVATE_KEY_SECRET_ARN",
+                "Value": {
+                  "Ref": "CdnPrivateKeySecretArn"
+                }
+              }
+            ],
+            "StopTimeout": 120,
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Fn::If": [
+                    "CreateWorkerLogs",
+                    {
+                      "Ref": "WorkerLogs"
+                    },
+                    {
+                      "Ref": "WorkerLogGroup"
+                    }
+                  ]
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "worker"
+              }
+            },
+            "Command": [
+              "python",
+              "-m",
+              "photo_library.worker"
+            ]
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "WorkerService": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "ServiceName": {
+          "Fn::Sub": "${StudentId}-a3-worker"
+        },
+        "Cluster": {
+          "Fn::If": [
+            "UseDedicatedA3Cluster",
+            {
+              "Ref": "Cluster"
+            },
+            {
+              "Ref": "ExistingClusterName"
+            }
+          ]
+        },
+        "TaskDefinition": {
+          "Ref": "WorkerTask"
+        },
+        "DesiredCount": 0,
+        "LaunchType": "FARGATE",
+        "DeploymentConfiguration": {
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true
+          }
+        },
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": {
+              "Ref": "AssignPublicIp"
+            },
+            "Subnets": {
+              "Ref": "TaskSubnets"
+            },
+            "SecurityGroups": [
+              {
+                "Ref": "TaskSecurityGroup"
+              }
+            ]
+          }
+        },
+        "PropagateTags": "SERVICE",
+        "EnableECSManagedTags": true,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "WorkerScalingTarget": {
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+      "Properties": {
+        "MinCapacity": 0,
+        "MaxCapacity": 4,
+        "ResourceId": {
+          "Fn::Join": [
+            "/",
+            [
+              "service",
+              {
+                "Fn::If": [
+                  "UseDedicatedA3Cluster",
+                  {
+                    "Ref": "Cluster"
+                  },
+                  {
+                    "Ref": "ExistingClusterName"
+                  }
+                ]
+              },
+              {
+                "Fn::GetAtt": [
+                  "WorkerService",
+                  "Name"
+                ]
+              }
+            ]
+          ]
+        },
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "ServiceNamespace": "ecs",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "ApiScalingPolicy": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Sub": "${StudentId}-a3-api-cpu"
+        },
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": {
+          "Ref": "ApiScalingTarget"
+        },
+        "TargetTrackingScalingPolicyConfiguration": {
+          "TargetValue": 60,
+          "ScaleInCooldown": 180,
+          "ScaleOutCooldown": 60,
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+          }
+        }
+      }
+    },
+    "ScaleOut": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Sub": "${StudentId}-a3-scaleout"
+        },
+        "PolicyType": "StepScaling",
+        "ScalingTargetId": {
+          "Ref": "WorkerScalingTarget"
+        },
+        "StepScalingPolicyConfiguration": {
+          "AdjustmentType": "ChangeInCapacity",
+          "Cooldown": 60,
+          "MetricAggregationType": "Maximum",
+          "StepAdjustments": [
+            {
+              "MetricIntervalLowerBound": 0,
+              "ScalingAdjustment": 1
+            }
+          ]
+        }
+      }
+    },
+    "ScaleIn": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Sub": "${StudentId}-a3-scalein"
+        },
+        "PolicyType": "StepScaling",
+        "ScalingTargetId": {
+          "Ref": "WorkerScalingTarget"
+        },
+        "StepScalingPolicyConfiguration": {
+          "AdjustmentType": "ExactCapacity",
+          "Cooldown": 300,
+          "MetricAggregationType": "Maximum",
+          "StepAdjustments": [
+            {
+              "MetricIntervalUpperBound": 0,
+              "ScalingAdjustment": 0
+            }
+          ]
+        }
+      }
+    },
+    "QueueBusy": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${StudentId}-a3-queue-busy"
+        },
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Statistic": "Maximum",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Ref": "ProcessingQueueName"
+            }
+          }
+        ],
+        "Period": 60,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "ScaleOut"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "QueueIdle": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${StudentId}-a3-queue-idle"
+        },
+        "Metrics": [
+          {
+            "Id": "visible",
+            "ReturnData": false,
+            "MetricStat": {
+              "Metric": {
+                "Namespace": "AWS/SQS",
+                "MetricName": "ApproximateNumberOfMessagesVisible",
+                "Dimensions": [
+                  {
+                    "Name": "QueueName",
+                    "Value": {
+                      "Ref": "ProcessingQueueName"
+                    }
+                  }
+                ]
+              },
+              "Period": 60,
+              "Stat": "Maximum"
+            }
+          },
+          {
+            "Id": "inflight",
+            "ReturnData": false,
+            "MetricStat": {
+              "Metric": {
+                "Namespace": "AWS/SQS",
+                "MetricName": "ApproximateNumberOfMessagesNotVisible",
+                "Dimensions": [
+                  {
+                    "Name": "QueueName",
+                    "Value": {
+                      "Ref": "ProcessingQueueName"
+                    }
+                  }
+                ]
+              },
+              "Period": 60,
+              "Stat": "Maximum"
+            }
+          },
+          {
+            "Id": "delayed",
+            "ReturnData": false,
+            "MetricStat": {
+              "Metric": {
+                "Namespace": "AWS/SQS",
+                "MetricName": "ApproximateNumberOfMessagesDelayed",
+                "Dimensions": [
+                  {
+                    "Name": "QueueName",
+                    "Value": {
+                      "Ref": "ProcessingQueueName"
+                    }
+                  }
+                ]
+              },
+              "Period": 60,
+              "Stat": "Maximum"
+            }
+          },
+          {
+            "Id": "total",
+            "Expression": "visible+inflight+delayed",
+            "ReturnData": true
+          }
+        ],
+        "EvaluationPeriods": 5,
+        "DatapointsToAlarm": 5,
+        "Threshold": 0,
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "ScaleIn"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "Dashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": {
+          "Fn::Sub": "${StudentId}-a3-operations"
+        },
+        "DashboardBody": {
+          "Fn::Sub": "{\"widgets\": [{\"type\": \"metric\", \"x\": 0, \"y\": 0, \"width\": 24, \"height\": 8, \"properties\": {\"title\": \"Processing backlog and in-flight work\", \"region\": \"${AWS::Region}\", \"period\": 60, \"stat\": \"Maximum\", \"metrics\": [[\"AWS/SQS\", \"ApproximateNumberOfMessagesVisible\", \"QueueName\", \"${ProcessingQueueName}\"], [\"AWS/SQS\", \"ApproximateNumberOfMessagesNotVisible\", \"QueueName\", \"${ProcessingQueueName}\"], [\"AWS/SQS\", \"ApproximateAgeOfOldestMessage\", \"QueueName\", \"${ProcessingQueueName}\"]]}}]}"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ClusterName": {
+      "Value": {
+        "Fn::If": [
+          "UseDedicatedA3Cluster",
+          {
+            "Ref": "Cluster"
+          },
+          {
+            "Ref": "ExistingClusterName"
+          }
+        ]
+      }
+    },
+    "ApiLogGroup": {
+      "Value": {
+        "Fn::If": [
+          "CreateApiLogs",
+          {
+            "Ref": "ApiLogs"
+          },
+          {
+            "Ref": "ApiLogGroup"
+          }
+        ]
+      }
+    },
+    "WorkerLogGroup": {
+      "Value": {
+        "Fn::If": [
+          "CreateWorkerLogs",
+          {
+            "Ref": "WorkerLogs"
+          },
+          {
+            "Ref": "WorkerLogGroup"
+          }
+        ]
+      }
+    },
+    "ApiServiceArn": {
+      "Value": {
+        "Ref": "ApiService"
+      }
+    },
+    "WorkerServiceArn": {
+      "Value": {
+        "Ref": "WorkerService"
+      }
+    },
+    "LoadBalancerArn": {
+      "Value": {
+        "Ref": "LoadBalancer"
+      }
+    },
+    "LoadBalancerDns": {
+      "Value": {
+        "Fn::GetAtt": [
+          "LoadBalancer",
+          "DNSName"
+        ]
+      }
+    },
+    "TargetGroupArn": {
+      "Value": {
+        "Ref": "TargetGroup"
+      }
+    },
+    "DashboardName": {
+      "Value": {
+        "Ref": "Dashboard"
+      }
+    },
+    "ScaleOutAlarm": {
+      "Value": {
+        "Ref": "QueueBusy"
+      }
+    },
+    "ScaleInAlarm": {
+      "Value": {
+        "Ref": "QueueIdle"
+      }
+    }
+  },
+  "Conditions": {
+    "UseDedicatedA3Cluster": {
+      "Fn::Equals": [
+        {
+          "Ref": "CreateA3Cluster"
+        },
+        "true"
+      ]
+    },
+    "ReuseA2Data": {
+      "Fn::Equals": [
+        {
+          "Ref": "ReuseAssignment2Resources"
+        },
+        "true"
+      ]
+    },
+    "CreateApiLogs": {
+      "Fn::Equals": [
+        {
+          "Ref": "ApiLogGroup"
+        },
+        ""
+      ]
+    },
+    "CreateWorkerLogs": {
+      "Fn::Equals": [
+        {
+          "Ref": "WorkerLogGroup"
+        },
+        ""
+      ]
+    }
+  }
+}

@@ -1,0 +1,403 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Optional standalone A3 data resources; do not deploy when repurposing A2 resources",
+  "Parameters": {
+    "StudentId": {
+      "Type": "String",
+      "Default": "n00000000",
+      "AllowedPattern": "n[0-9]{8}"
+    },
+    "QutUsername": {
+      "Type": "String",
+      "Default": "student@example.edu"
+    },
+    "ClientOrigin": {
+      "Type": "String",
+      "Description": "Exact HTTPS browser origin, without trailing slash",
+      "AllowedPattern": "https://[^/]+(:[0-9]+)?"
+    }
+  },
+  "Rules": {
+    "SydneyOnly": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Equals": [
+              {
+                "Ref": "AWS::Region"
+              },
+              "ap-southeast-2"
+            ]
+          },
+          "AssertDescription": "Deploy regional resources in ap-southeast-2"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "MediaBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${StudentId}-a3-media-${AWS::AccountId}"
+        },
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "CorsConfiguration": {
+          "CorsRules": [
+            {
+              "AllowedOrigins": [
+                {
+                  "Ref": "ClientOrigin"
+                }
+              ],
+              "AllowedMethods": [
+                "POST",
+                "GET",
+                "HEAD"
+              ],
+              "AllowedHeaders": [
+                "*"
+              ],
+              "MaxAge": 600
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "AbortIncompleteUploads",
+              "Status": "Enabled",
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "LibraryTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "${StudentId}-a3-library"
+        },
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "sk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "sk",
+            "KeyType": "RANGE"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ProcessingDLQ": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${StudentId}-a3-processing-dlq"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "ProcessingQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${StudentId}-a3-processing"
+        },
+        "VisibilityTimeout": 180,
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "MessageRetentionPeriod": 345600,
+        "SqsManagedSseEnabled": true,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ],
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "ProcessingDLQ",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": 5
+        }
+      }
+    },
+    "Repository": {
+      "Type": "AWS::ECR::Repository",
+      "Properties": {
+        "RepositoryName": {
+          "Fn::Sub": "${StudentId}-a3-library"
+        },
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "ImageTagMutability": "IMMUTABLE",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ApiLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "${StudentId}-a3-apilogs"
+        },
+        "RetentionInDays": 7,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "WorkerLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "${StudentId}-a3-workerlogs"
+        },
+        "RetentionInDays": 7,
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    },
+    "DeadLetterAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${StudentId}-a3-dead-letters"
+        },
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "ProcessingDLQ",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Maximum",
+        "Period": 60,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "Tags": [
+          {
+            "Key": "qut-username",
+            "Value": {
+              "Ref": "QutUsername"
+            }
+          },
+          {
+            "Key": "purpose",
+            "Value": "assessment 3"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "MediaBucketName": {
+      "Value": {
+        "Ref": "MediaBucket"
+      }
+    },
+    "MediaBucketArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "MediaBucket",
+          "Arn"
+        ]
+      }
+    },
+    "LibraryTableName": {
+      "Value": {
+        "Ref": "LibraryTable"
+      }
+    },
+    "LibraryTableArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "LibraryTable",
+          "Arn"
+        ]
+      }
+    },
+    "ProcessingQueueUrl": {
+      "Value": {
+        "Ref": "ProcessingQueue"
+      }
+    },
+    "ProcessingQueueArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ProcessingQueue",
+          "Arn"
+        ]
+      }
+    },
+    "ProcessingQueueName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ProcessingQueue",
+          "QueueName"
+        ]
+      }
+    },
+    "ProcessingDLQUrl": {
+      "Value": {
+        "Ref": "ProcessingDLQ"
+      }
+    },
+    "ProcessingDLQArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ProcessingDLQ",
+          "Arn"
+        ]
+      }
+    },
+    "RepositoryUri": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Repository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "ApiLogGroup": {
+      "Value": {
+        "Ref": "ApiLogs"
+      }
+    },
+    "WorkerLogGroup": {
+      "Value": {
+        "Ref": "WorkerLogs"
+      }
+    },
+    "DeadLetterAlarm": {
+      "Value": {
+        "Ref": "DeadLetterAlarm"
+      }
+    }
+  }
+}

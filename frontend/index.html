@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf9f6">
+  <meta name="description" content="A private family photo library that helps you find, organise and revisit your photos.">
+  <title>Stillday — Family Photo Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/polish.css?v=slideshow-fit-19">
+  <script type="module" src="/app.js?v=photo-ui-20"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#library" aria-label="Stillday home"><span class="brand-mark">s</span><span>stillday<span class="brand-dot">.</span></span></a>
+      <div class="family-picker"><span class="eyebrow">YOUR HOME</span><label for="family-select" class="visually-hidden">Choose a family album</label><select id="family-select"><option value="">Create or choose a family</option></select><button class="new-family-button" id="new-family"><span aria-hidden="true">＋</span> New family album</button></div>
+      <div class="side-heading eyebrow">YOUR LIBRARY</div>
+      <nav class="navigation" aria-label="Photo library">
+        <button class="nav-link active" data-view="library"><span class="nav-icon">▦</span><span>All photos</span><span class="nav-count" id="photo-count">0</span></button>
+        <button class="nav-link" data-view="album"><span class="nav-icon">⌕</span><span>Find &amp; make albums</span></button>
+        <button class="nav-link" data-view="memories"><span class="nav-icon">◷</span><span>On this day</span></button>
+        <button class="nav-link" data-view="suggestions"><span class="nav-icon">✳</span><span>Needs a look</span><span class="nav-count warm-count" id="review-count">0</span></button>
+        <button class="nav-link" data-view="compare"><span class="nav-icon">↗</span><span>Photo pairs</span></button>
+        <button class="nav-link" data-view="trash"><span class="nav-icon">⌫</span><span>Recently deleted</span></button>
+      </nav>
+      <div class="side-note"><span class="privacy-icon">⌑</span><div><strong>Your family's, always.</strong><p>Private pictures, shared on your terms.</p></div></div>
+      <div class="sidebar-bottom"><button class="member-button" id="share-family" aria-label="Manage family members">♧ &nbsp; Family access</button><div class="profile-row"><div class="avatar" id="profile-avatar">L</div><div class="profile-copy"><strong id="profile-name">Local owner</strong><span id="profile-role">Family admin</span></div><button class="more-button" id="identity-toggle" title="Switch local demo identity" aria-label="Switch local demo identity">···</button></div></div>
+    </aside>
+
+    <main id="main" class="main-panel">
+      <header class="topbar"><button class="mobile-brand" id="mobile-menu">☰ <span>stillday.</span></button><div class="breadcrumbs" id="breadcrumbs">Your space <span>/</span> All photos</div><div class="top-actions"><span class="sync-status" id="sync-status"><span class="status-dot"></span> Your library is up to date</span><button class="icon-button" id="refresh" title="Refresh library" aria-label="Refresh library">↻</button><button class="avatar avatar-small" id="mobile-profile" title="Current profile">L</button></div></header>
+      <section id="connection-panel" class="connection-panel hidden" aria-live="polite"></section>
+      <section id="page-content" aria-live="polite"></section>
+      <footer class="footer-note">Made for the moments you want to keep<span>✳</span></footer>
+    </main>
+  </div>
+  <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+  <dialog id="trash-confirm-dialog" class="dialog confirm-dialog" aria-labelledby="trash-confirm-title" aria-describedby="trash-confirm-copy"><form method="dialog"><button type="button" class="dialog-close" data-close="trash-confirm-dialog" aria-label="Close">&times;</button><h2 id="trash-confirm-title">Move photo to Recently deleted</h2><p class="dialog-copy confirm-copy" id="trash-confirm-copy"><strong id="trash-confirm-name"></strong><span id="trash-confirm-detail"> can be restored later.</span></p><div class="confirm-actions"><button type="button" class="button button-keep" data-close="trash-confirm-dialog" autofocus>Cancel</button><button id="trash-confirm-submit" type="submit" class="button button-danger" value="move">Move photo</button></div></form></dialog>
+  <dialog id="family-dialog" class="dialog"><form id="family-form" method="dialog"><button type="button" class="dialog-close" data-close="family-dialog" aria-label="Close">×</button><span class="dialog-icon">⌂</span><p class="eyebrow">A PLACE FOR YOUR MEMORIES</p><h2>Create a family album</h2><p class="dialog-copy">Keep the photos that matter to your family in one private space.</p><label for="family-name">Give this album a name</label><input id="family-name" name="name" maxlength="100" placeholder="The Parkers" required><button class="button button-primary button-wide" type="submit">Create your space <span>→</span></button></form></dialog>
+  <dialog id="members-dialog" class="dialog"><form id="member-form" method="dialog"><button type="button" class="dialog-close" data-close="members-dialog" aria-label="Close">×</button><span class="dialog-icon">♧</span><p class="eyebrow">BETTER TOGETHER</p><h2>Invite family</h2><p class="dialog-copy">Add an existing account using their Cognito user ID. Only an album owner can add members.</p><label for="member-id">Cognito user ID</label><input id="member-id" name="userId" autocomplete="off" placeholder="Their account ID" required><label for="member-role">Access level</label><select id="member-role" name="role"><option value="viewer">Viewer — browse and play</option><option value="contributor">Contributor — add and organise</option></select><button class="button button-primary button-wide" type="submit">Add to your album <span>→</span></button></form></dialog>
+  <dialog id="metadata-dialog" class="dialog"><form id="metadata-form" method="dialog"><button type="button" class="dialog-close" data-close="metadata-dialog" aria-label="Close">×</button><span class="dialog-icon">✎</span><p class="eyebrow">MAKE IT YOURS</p><h2>Photo details</h2><p class="dialog-copy">Add names to make family albums easier to find.</p><p class="photo-uploaded">Uploaded: <time id="metadata-uploaded"></time></p><input id="metadata-photo-id" type="hidden"><label for="metadata-people">People in this photo</label><input id="metadata-people" maxlength="600" placeholder="Mum, Dad, Jamie"><label for="metadata-date">Date taken</label><input id="metadata-date" type="date"><div class="check-row"><input type="checkbox" id="metadata-favourite"><label for="metadata-favourite">Keep this one close · add to favourites</label></div><button class="button button-primary button-wide" type="submit">Save details <span>→</span></button></form></dialog>
+  <dialog id="identity-dialog" class="dialog"><form id="identity-form" method="dialog"><button type="button" class="dialog-close" data-close="identity-dialog" aria-label="Close">×</button><span class="dialog-icon">♙</span><p class="eyebrow">LOCAL PREVIEW</p><h2>Try a different account</h2><p class="dialog-copy">Switch to a demo identity to check how family permissions behave. This option works only when the API runs in local mode.</p><label for="identity-name">Demo account ID</label><input id="identity-name" maxlength="64" pattern="[a-zA-Z0-9_-]+" value="local-viewer" required><button class="button button-primary button-wide" type="submit">Switch account <span>→</span></button></form></dialog>
+  <dialog id="signout-confirm-dialog" class="dialog confirm-dialog"><form method="dialog"><h2>Sign out of Stillday?</h2><p class="dialog-copy">You can sign in again any time.</p><div class="confirm-actions"><button type="button" class="button button-keep" data-close="signout-confirm-dialog">Cancel</button><button type="button" class="button button-danger" id="confirm-signout">Sign out</button></div></form></dialog>
+  <dialog id="access-dialog" class="dialog"><form id="access-dialog-form" novalidate><button type="button" class="dialog-close" data-close="access-dialog" aria-label="Close">&times;</button><p class="eyebrow">YOUR PRIVATE LIBRARY</p><h2>Sign in to Stillday</h2><p class="dialog-copy">Use your existing photo library account. Your password is sent securely to Amazon Cognito and is not saved by this application.</p><label for="login-username">Username or email</label><input id="login-username" autocomplete="username" required><label for="login-password">Password</label><input id="login-password" type="password" autocomplete="current-password" required><div id="login-status" class="login-status" role="status" aria-live="polite" tabindex="-1">Enter your username and password, then select Sign in.</div><button class="button button-primary button-wide" type="submit">Sign in</button></form></dialog>
+</body>
+</html>
+
